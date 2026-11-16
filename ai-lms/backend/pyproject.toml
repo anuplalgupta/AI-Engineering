@@ -1,0 +1,98 @@
+[project]
+name = "ailms"
+version = "0.1.0"
+description = "AI-LMS backend"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q -p no:cacheprovider"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+# Module boundaries (ADR 0001 items 1 and 8). A module may import ailms.platform
+# and another module's api.py, never anything else of another module.
+[tool.importlinter]
+root_package = "ailms"
+
+[[tool.importlinter.contracts]]
+name = "platform does not import the modules"
+type = "forbidden"
+source_modules = ["ailms.platform"]
+forbidden_modules = [
+    "ailms.identity", "ailms.catalog", "ailms.content",
+    "ailms.assessment", "ailms.learner", "ailms.analytics",
+    "ailms.main", "ailms.seed", "ailms.bootstrap", "ailms.registry", "ailms.system_routes",
+]
+
+[[tool.importlinter.contracts]]
+name = "identity uses other modules through api.py only"
+type = "forbidden"
+source_modules = ["ailms.identity"]
+forbidden_modules = ["ailms.catalog", "ailms.content", "ailms.assessment", "ailms.learner", "ailms.analytics"]
+allow_indirect_imports = true
+ignore_imports = ["ailms.identity -> ailms.*.api", "ailms.identity.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "catalog uses other modules through api.py only"
+type = "forbidden"
+source_modules = ["ailms.catalog"]
+forbidden_modules = ["ailms.identity", "ailms.content", "ailms.assessment", "ailms.learner", "ailms.analytics"]
+allow_indirect_imports = true
+ignore_imports = ["ailms.catalog -> ailms.*.api", "ailms.catalog.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "content uses other modules through api.py only"
+type = "forbidden"
+source_modules = ["ailms.content"]
+forbidden_modules = ["ailms.identity", "ailms.catalog", "ailms.assessment", "ailms.learner", "ailms.analytics"]
+allow_indirect_imports = true
+ignore_imports = ["ailms.content -> ailms.*.api", "ailms.content.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "assessment uses other modules through api.py only"
+type = "forbidden"
+source_modules = ["ailms.assessment"]
+forbidden_modules = ["ailms.identity", "ailms.catalog", "ailms.content", "ailms.learner", "ailms.analytics"]
+allow_indirect_imports = true
+ignore_imports = ["ailms.assessment -> ailms.*.api", "ailms.assessment.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "learner uses other modules through api.py only"
+type = "forbidden"
+source_modules = ["ailms.learner"]
+forbidden_modules = ["ailms.identity", "ailms.catalog", "ailms.content", "ailms.assessment", "ailms.analytics"]
+allow_indirect_imports = true
+ignore_imports = ["ailms.learner -> ailms.*.api", "ailms.learner.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "analytics uses other modules through api.py only"
+type = "forbidden"
+source_modules = ["ailms.analytics"]
+forbidden_modules = ["ailms.identity", "ailms.catalog", "ailms.content", "ailms.assessment", "ailms.learner"]
+allow_indirect_imports = true
+ignore_imports = ["ailms.analytics -> ailms.*.api", "ailms.analytics.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "the application shell uses modules through api.py only"
+type = "forbidden"
+source_modules = [
+    "ailms.main", "ailms.seed", "ailms.bootstrap", "ailms.registry",
+    "ailms.system_routes", "ailms.tools",
+]
+forbidden_modules = [
+    "ailms.identity", "ailms.catalog", "ailms.content",
+    "ailms.assessment", "ailms.learner", "ailms.analytics",
+]
+allow_indirect_imports = true
+ignore_imports = ["ailms.* -> ailms.*.api", "ailms.tools.** -> ailms.*.api"]
+unmatched_ignore_imports_alerting = "none"

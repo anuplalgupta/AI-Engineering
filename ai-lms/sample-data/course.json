@@ -1,0 +1,35 @@
+{
+  "organisation": { "slug": "default", "name": "Sample Institute" },
+  "accounts": [
+    { "email": "admin@demo.example", "display_name": "Demo Admin", "role": "admin" },
+    { "email": "reviewer@demo.example", "display_name": "Demo Reviewer", "role": "reviewer" },
+    { "email": "student@demo.example", "display_name": "Demo Student", "role": "student" }
+  ],
+  "programme": { "slug": "jee-main-sample", "title": "JEE Main (sample)" },
+  "course": {
+    "slug": "physics-11-vectors-kinematics",
+    "title": "Physics, Class 11 (sample): Vectors and Kinematics",
+    "subject": "Physics",
+    "level": "Class 11",
+    "topics": [
+      { "slug": "vectors", "title": "Vectors", "parent": null, "position": 1, "prerequisites": [] },
+      { "slug": "scalars-and-vectors", "title": "Scalars and vectors", "parent": "vectors", "position": 1, "prerequisites": [] },
+      { "slug": "adding-vectors-components", "title": "Adding vectors and resolving them into components", "parent": "vectors", "position": 2, "prerequisites": ["scalars-and-vectors"] },
+      { "slug": "unit-vectors", "title": "Unit vectors and vector algebra", "parent": "vectors", "position": 3, "prerequisites": ["adding-vectors-components"] },
+      { "slug": "scalar-product", "title": "The scalar (dot) product", "parent": "vectors", "position": 4, "prerequisites": ["unit-vectors"] },
+      { "slug": "kinematics", "title": "Kinematics", "parent": null, "position": 2, "prerequisites": [] },
+      { "slug": "position-displacement-velocity", "title": "Position, displacement and average velocity", "parent": "kinematics", "position": 1, "prerequisites": ["scalars-and-vectors"] },
+      { "slug": "instantaneous-velocity-acceleration", "title": "Instantaneous velocity and acceleration", "parent": "kinematics", "position": 2, "prerequisites": ["position-displacement-velocity"] },
+      { "slug": "constant-acceleration", "title": "Motion with constant acceleration", "parent": "kinematics", "position": 3, "prerequisites": ["instantaneous-velocity-acceleration"] },
+      { "slug": "free-fall", "title": "Free fall", "parent": "kinematics", "position": 4, "prerequisites": ["constant-acceleration"] },
+      { "slug": "motion-in-two-dimensions", "title": "Motion in two dimensions", "parent": "kinematics", "position": 5, "prerequisites": ["constant-acceleration", "adding-vectors-components"] },
+      { "slug": "projectile-motion", "title": "Projectile motion", "parent": "kinematics", "position": 6, "prerequisites": ["motion-in-two-dimensions", "free-fall"] }
+    ]
+  },
+  "lessons": [
+    { "slug": "adding-vectors-components-tutorial", "topic": "adding-vectors-components", "file": "lessons/adding-vectors-components.json" }
+  ],
+  "media": [
+    { "key": "sample/vectors/vector-components.svg", "file": "images/vector-components.svg", "content_type": "image/svg+xml" }
+  ]
+}

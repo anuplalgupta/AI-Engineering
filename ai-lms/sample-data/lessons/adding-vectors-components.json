@@ -1,0 +1,181 @@
+{
+  "title": "Adding vectors and resolving them into components",
+  "estimated_minutes": 8,
+  "attribution": "This sample course follows the topic order of an openly licensed textbook, OpenStax University Physics Volume 1, which is licensed under Creative Commons Attribution 4.0 (CC BY 4.0). The text and the diagram of this lesson are original to this project.",
+  "document": {
+    "schema_version": 1,
+    "sections": [
+      {
+        "id": "why-vectors",
+        "type": "explanation",
+        "title": "Why vectors need their own rules",
+        "body_md": "Some quantities are complete once you give a number and a unit: a mass of 2 kg, a temperature of 300 K. These are **scalars**, and they add like ordinary numbers.\n\nOther quantities also have a direction: displacement, velocity, force. These are **vectors**. We write a vector as $\\vec{A}$ and its size, called its *magnitude*, as $A$ or $|\\vec{A}|$. The magnitude is never negative.\n\nDirections matter when vectors are added. If you walk 4 km east and then 3 km north, you have walked 7 km, but you are only 5 km from where you started. So $|\\vec{A} + \\vec{B}|$ is usually **not** $A + B$.",
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "head-to-tail",
+        "type": "explanation",
+        "title": "Adding vectors by drawing",
+        "body_md": "To add $\\vec{A}$ and $\\vec{B}$ on paper, draw $\\vec{A}$ as an arrow, then start $\\vec{B}$ at the tip (head) of $\\vec{A}$. The sum, or **resultant**, $\\vec{R} = \\vec{A} + \\vec{B}$ is the arrow from the tail of $\\vec{A}$ to the tip of $\\vec{B}$. This is the *head-to-tail* rule.\n\nThe order does not matter: $\\vec{A} + \\vec{B} = \\vec{B} + \\vec{A}$. To subtract, add the opposite vector: $\\vec{A} - \\vec{B} = \\vec{A} + (-\\vec{B})$, where $-\\vec{B}$ has the same magnitude as $\\vec{B}$ and points the other way.\n\nDrawing shows what is happening, but measuring arrows with a ruler is slow and not exact. For calculation we use **components**.",
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "components-diagram",
+        "type": "diagram",
+        "title": "A vector and its components",
+        "image": {
+          "key": "sample/vectors/vector-components.svg",
+          "alt": "A vector A drawn from the origin, up and to the right, at an angle theta above the x axis. A horizontal arrow along the x axis is labelled A x and a vertical arrow up to the tip of A is labelled A y. The three arrows form a right-angled triangle.",
+          "caption": "The components of a vector are the two sides of a right-angled triangle whose hypotenuse is the vector itself."
+        },
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "resolving",
+        "type": "derivation",
+        "title": "Resolving a vector into components",
+        "body_md": "*Resolving* a vector means replacing it by two vectors along the $x$ and $y$ axes that add up to it.",
+        "steps": [
+          {
+            "id": "triangle",
+            "body_md": "Put the tail of $\\vec{A}$ at the origin and let $\\theta$ be the angle measured anticlockwise from the positive $x$ axis. Drop a perpendicular from the tip of $\\vec{A}$ to the $x$ axis. This makes a right-angled triangle with hypotenuse $A$ and sides $A_x$ and $A_y$."
+          },
+          {
+            "id": "ratios",
+            "body_md": "In that triangle, by the definitions of cosine and sine,\n\n$$\\cos\\theta = \\frac{A_x}{A}, \\qquad \\sin\\theta = \\frac{A_y}{A}$$"
+          },
+          {
+            "id": "components",
+            "body_md": "Multiply both by $A$ to get the components:\n\n$$A_x = A\\cos\\theta, \\qquad A_y = A\\sin\\theta$$\n\nA component can be negative. It is negative when the vector points along the negative direction of that axis."
+          },
+          {
+            "id": "magnitude",
+            "body_md": "To go back from components to magnitude, use the Pythagorean theorem:\n\n$$A = \\sqrt{A_x^2 + A_y^2}$$"
+          },
+          {
+            "id": "direction",
+            "body_md": "The direction comes from the ratio of the two sides:\n\n$$\\tan\\theta = \\frac{A_y}{A_x}$$\n\nA calculator gives $\\tan^{-1}$ only between $-90^\\circ$ and $90^\\circ$, so look at the signs of $A_x$ and $A_y$ to decide which quadrant the vector is really in."
+          }
+        ],
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "adding-by-components",
+        "type": "explanation",
+        "title": "Adding by components",
+        "body_md": "Components along the same axis lie on one line, so they add like ordinary numbers. If $\\vec{R} = \\vec{A} + \\vec{B}$, then\n\n$$R_x = A_x + B_x, \\qquad R_y = A_y + B_y$$\n\nThis turns one hard problem with arrows into two easy sums. The method works for any number of vectors: resolve each one, add all the $x$ components, add all the $y$ components, then find the magnitude and direction of the result.",
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "example-walk",
+        "type": "worked_example",
+        "title": "Worked example: two displacements",
+        "body_md": "A student walks 4.0 km due east, then 3.0 km in a direction $60^\\circ$ north of east. How far, and in what direction, is she from her starting point?",
+        "steps": [
+          {
+            "id": "axes",
+            "body_md": "**Choose axes.** Take $x$ towards east and $y$ towards north. Call the two displacements $\\vec{A}$ and $\\vec{B}$."
+          },
+          {
+            "id": "resolve",
+            "body_md": "**Resolve each vector.** $\\vec{A}$ points along $x$, so $A_x = 4.0$ km and $A_y = 0$. For $\\vec{B}$:\n\n$$B_x = 3.0\\cos 60^\\circ = 1.5\\ \\text{km}, \\qquad B_y = 3.0\\sin 60^\\circ \\approx 2.6\\ \\text{km}$$"
+          },
+          {
+            "id": "add",
+            "body_md": "**Add the components.**\n\n$$R_x = 4.0 + 1.5 = 5.5\\ \\text{km}, \\qquad R_y = 0 + 2.6 = 2.6\\ \\text{km}$$"
+          },
+          {
+            "id": "magnitude",
+            "body_md": "**Find the magnitude.**\n\n$$R = \\sqrt{5.5^2 + 2.6^2} = \\sqrt{37.0} \\approx 6.1\\ \\text{km}$$"
+          },
+          {
+            "id": "direction",
+            "body_md": "**Find the direction.** Both components are positive, so the angle is in the first quadrant:\n\n$$\\theta = \\tan^{-1}\\!\\left(\\frac{2.6}{5.5}\\right) \\approx 25^\\circ$$"
+          },
+          {
+            "id": "answer",
+            "body_md": "**Answer and check.** She is about 6.1 km from the start, in a direction about $25^\\circ$ north of east. The answer is sensible: it is less than the 7.0 km she walked, and more than the 4.0 km of the first leg."
+          }
+        ],
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "mistakes",
+        "type": "common_mistakes",
+        "title": "Common mistakes",
+        "items": [
+          "Adding magnitudes directly. $R = A + B$ is true only when the two vectors point the same way.",
+          "Swapping sine and cosine. $A_x = A\\cos\\theta$ holds when $\\theta$ is measured from the $x$ axis. If the angle is given from the $y$ axis, the two are exchanged.",
+          "Dropping the sign of a component. A vector pointing west has a negative $x$ component if east is positive.",
+          "Trusting $\\tan^{-1}$ without checking the quadrant. If $A_x$ is negative, add $180^\\circ$ to the calculator's answer."
+        ],
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "key-points",
+        "type": "key_points",
+        "title": "Key points",
+        "items": [
+          "A vector has a magnitude and a direction; a scalar has a magnitude only.",
+          "Vectors add head to tail. The resultant runs from the first tail to the last tip.",
+          "Components: $A_x = A\\cos\\theta$ and $A_y = A\\sin\\theta$, with $\\theta$ measured from the positive $x$ axis.",
+          "Magnitude and direction: $A = \\sqrt{A_x^2 + A_y^2}$ and $\\tan\\theta = A_y / A_x$.",
+          "To add vectors, add their $x$ components and their $y$ components separately."
+        ],
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      },
+      {
+        "id": "summary",
+        "type": "summary",
+        "title": "Summary",
+        "body_md": "Vectors cannot be added like plain numbers, because direction matters. Resolving each vector into components along fixed axes turns vector addition into ordinary addition, done once for each axis. The same steps are used throughout mechanics: for velocities in projectile motion, and for forces in Newton's laws. In the next topic, unit vectors give a compact way to write these components.",
+        "sources": [
+          {
+            "source_title": "OpenStax University Physics Volume 1, Chapter 2: Vectors",
+            "pages": []
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# Used when the build context is this folder (the backend image).
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.import_linter_cache
+**/.venv
+**/node_modules
+**/dist
+.git
+docs
+web
+deploy

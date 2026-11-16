@@ -1,0 +1,15 @@
+# Direct dependencies. The pinned set with hashes is requirements.txt;
+# see README.md for how to regenerate it.
+fastapi
+uvicorn
+sqlalchemy>=2.0
+alembic
+psycopg[binary,pool]>=3.2
+procrastinate>=3
+pydantic-settings
+minio
+
+# Tests and checks. They ship in the image so that the tests run with Docker alone.
+pytest
+httpx
+import-linter>=2.1

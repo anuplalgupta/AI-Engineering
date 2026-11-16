@@ -1,0 +1,13 @@
+# Secrets written by the setup script
+deploy/.env
+
+# Web app
+node_modules/
+web/dist/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.import_linter_cache/
+.venv/
