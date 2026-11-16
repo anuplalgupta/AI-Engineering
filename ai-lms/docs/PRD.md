@@ -2,10 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | Draft — awaiting approval |
-| **Version** | 0.1 |
+| **Status** | Approved 2026-11-16 as a living document — expected to change as we learn |
+| **Version** | 1.0 |
 | **Date** | 2026-11-16 |
-| **Next step after approval** | Architecture Decision Records in `docs/adr/` |
+| **Architecture** | [Architecture Decision Records](adr/README.md) |
+| **Changing this document** | Edit it, bump the version, add a line to the change log at the end, and check the "Revisit if" section of each ADR |
 
 ---
 
@@ -185,7 +186,7 @@ Targets are starting assumptions to be revised once pilot data exists.
 
 ## 10. Open questions
 
-These need a decision from the product owner. The PRD currently assumes the recommended answer.
+The PRD was approved on the assumed answers below. They remain open to change; each ADR lists which of these it depends on.
 
 1. **Pilot segment.** JEE Main Physics Class 11 (recommended), or a different exam, class or subject?
 2. **Who operates it?** A single platform we run ourselves (assumed), or software sold to many institutes, each with its own admins, content and students? This changes the data model and is expensive to change later.
@@ -204,3 +205,10 @@ These need a decision from the product owner. The PRD currently assumes the reco
 - **Mastery** — the system's estimate of how well a student knows a topic, updated after every assessment.
 - **PYQ** — previous years' questions from real exam papers.
 - **Milestone evaluation** — a test placed in the study plan and built for the individual student.
+
+## 12. Change log
+
+| Version | Date | Change |
+|---|---|---|
+| 0.1 | 2026-11-16 | First draft. |
+| 1.0 | 2026-11-16 | Approved on the assumed answers in section 10. Kept as a living document. |

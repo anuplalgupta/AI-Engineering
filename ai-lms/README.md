@@ -6,5 +6,5 @@ An AI learning management system for school students, undergraduates and competi
 
 | Document | Status |
 |---|---|
-| [Product Requirements (PRD)](docs/PRD.md) | Draft — awaiting approval |
-| Architecture Decision Records (`docs/adr/`) | Not started — follows PRD approval |
+| [Product Requirements (PRD)](docs/PRD.md) | Approved v1.0, living document |
+| [Architecture Decision Records](docs/adr/README.md) | Proposed — awaiting review |
