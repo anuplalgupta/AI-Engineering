@@ -12,7 +12,11 @@ class Settings(BaseSettings):
 
     app_version: str = "0.1.0"
 
+    # The application's role: no superuser rights, so row-level security applies to it.
     database_url: str
+    # The owner of the schema, used only by start-up (migrations, granting rights) and by
+    # the tests to create their throwaway database. The worker does not get it.
+    admin_database_url: str | None = None
     secret_key: str
 
     s3_endpoint: str = "http://objectstore:9000"
@@ -36,6 +40,14 @@ class Settings(BaseSettings):
     login_code_minutes: int = 10
     login_code_max_attempts: int = 5
     login_code_max_requests: int = 3  # per email, per login_code_minutes
+    # Long-horizon caps per email, over login_lockout_hours: after this many wrong codes the
+    # address is locked until the window passes, and no more than this many codes are sent.
+    login_lockout_hours: int = 24
+    login_max_failures_per_day: int = 10
+    login_max_codes_per_day: int = 10
+    # Per client address, per hour, across all emails.
+    client_max_code_requests_per_hour: int = 20
+    client_max_code_checks_per_hour: int = 30
 
     sample_data_dir: Path = Path("/app/sample-data")
 

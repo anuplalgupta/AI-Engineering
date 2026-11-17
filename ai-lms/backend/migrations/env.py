@@ -13,7 +13,10 @@ def _is_ours(name, type_, parent_names) -> bool:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(get_settings().database_url, poolclass=pool.NullPool)
+    # Migrations run as the schema owner, not as the application's role.
+    settings = get_settings()
+    url = settings.admin_database_url or settings.database_url
+    engine = create_engine(url, poolclass=pool.NullPool)
     with engine.connect() as connection:
         context.configure(
             connection=connection,

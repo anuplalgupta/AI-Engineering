@@ -1,7 +1,10 @@
-"""Public interface of the identity module. Other modules import from here only."""
+"""Public interface of the identity module. Other modules import from here only.
+
+Only service functions, dependencies and plain data types are exported, never the
+tables (ORM classes): sessions and sign-in codes are handled by identity alone.
+"""
 
 from ailms.identity.deps import SESSION_COOKIE, current_user, organisation_session, require_role
-from ailms.identity.models import LoginCode, Organisation, User, UserSession
 from ailms.identity.routes import ErrorOut, router
 from ailms.identity.service import (
     CurrentUser,
@@ -9,26 +12,20 @@ from ailms.identity.service import (
     any_organisation_exists,
     ensure_organisation,
     ensure_user,
-    organisation_by_slug,
-    start_session,
+    organisation_id_by_slug,
 )
 
 __all__ = [
     "SESSION_COOKIE",
     "CurrentUser",
     "ErrorOut",
-    "LoginCode",
-    "Organisation",
     "Role",
-    "User",
-    "UserSession",
     "any_organisation_exists",
     "current_user",
     "ensure_organisation",
     "ensure_user",
-    "organisation_by_slug",
+    "organisation_id_by_slug",
     "organisation_session",
     "require_role",
     "router",
-    "start_session",
 ]

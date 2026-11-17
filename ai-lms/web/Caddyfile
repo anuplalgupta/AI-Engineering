@@ -5,6 +5,9 @@
 	servers {
 		# Keep X-Forwarded-Proto/-For from a TLS proxy on a private network in front of us.
 		trusted_proxies static private_ranges
+		# The client address is the first untrusted one from the right, so a browser
+		# cannot choose its own address by sending X-Forwarded-For.
+		trusted_proxies_strict
 	}
 }
 
@@ -34,7 +37,10 @@
 	# The backend sets its own cache headers. Caddy adds X-Forwarded-For, -Host and -Proto
 	# (the scheme the browser used, passed through from a trusted proxy in front).
 	handle /api/* {
-		reverse_proxy http://backend:8000
+		reverse_proxy http://backend:8000 {
+			# The backend counts sign-in requests per client address (rate limits).
+			header_up X-Real-IP {client_ip}
+		}
 	}
 
 	# File names under /assets carry a content hash, so they can be cached for a year.

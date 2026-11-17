@@ -1,8 +1,9 @@
-"""Trust X-Forwarded-Proto only from the web server container (Caddy).
+"""Trust X-Forwarded-Proto and X-Real-IP only from the web server container (Caddy).
 
 The backend is reachable only inside the Compose network, but any container
-there could send the header. The request's scheme is changed to https only
-when the direct peer is one of the trusted proxy hosts.
+there could send the headers. The request's scheme is changed to https, and its
+client address to the one Caddy saw, only when the direct peer is one of the
+trusted proxy hosts.
 """
 
 import socket
@@ -42,13 +43,17 @@ class TrustedProxyMiddleware:
         if scope["type"] in ("http", "websocket"):
             client = scope.get("client")
             if client and client[0] in self._trusted_addresses():
+                scope = dict(scope)
                 for name, value in scope.get("headers", []):
                     if name == b"x-forwarded-proto":
                         proto = value.decode("latin-1").split(",")[0].strip().lower()
                         if proto in ("http", "https"):
-                            scope = dict(scope)
                             scope["scheme"] = proto if scope["type"] == "http" else (
                                 "wss" if proto == "https" else "ws"
                             )
-                        break
+                    elif name == b"x-real-ip":
+                        # Caddy sets this to the address it worked out ({client_ip}).
+                        address = value.decode("latin-1").strip()
+                        if address and len(address) <= 64:
+                            scope["client"] = (address, 0)
         await self.app(scope, receive, send)

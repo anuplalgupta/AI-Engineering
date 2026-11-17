@@ -61,7 +61,7 @@ def import_course(
     subject: str,
     level: str,
     topics: list[TopicSpec],
-) -> Course:
+) -> uuid.UUID:
     """Create a programme, a course and its topic tree with fixed ids.
 
     Anything that already exists is left as it is, so running it twice changes nothing.
@@ -106,4 +106,4 @@ def import_course(
             if (spec.id, prerequisite_id) not in linked:
                 session.add(TopicPrerequisite(topic_id=spec.id, prerequisite_id=prerequisite_id))
     session.flush()
-    return course
+    return course.id

@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
 
 from sqlalchemy import func, select
@@ -56,19 +56,22 @@ def organisation_by_slug(session: Session, slug: str) -> Organisation | None:
     return session.scalar(select(Organisation).where(Organisation.slug == slug))
 
 
+def organisation_id_by_slug(session: Session, slug: str) -> uuid.UUID | None:
+    return session.scalar(select(Organisation.id).where(Organisation.slug == slug))
+
+
 def any_organisation_exists(session: Session) -> bool:
     return session.scalar(select(Organisation.id).limit(1)) is not None
 
 
 def ensure_organisation(
     session: Session, *, organisation_id: uuid.UUID, slug: str, name: str
-) -> Organisation:
-    organisation = session.get(Organisation, organisation_id)
-    if organisation is None:
-        organisation = Organisation(id=organisation_id, slug=slug, name=name)
-        session.add(organisation)
+) -> uuid.UUID:
+    """Create the organisation if it does not exist. Returns its id."""
+    if session.get(Organisation, organisation_id) is None:
+        session.add(Organisation(id=organisation_id, slug=slug, name=name))
         session.flush()
-    return organisation
+    return organisation_id
 
 
 def ensure_user(
@@ -79,7 +82,8 @@ def ensure_user(
     role: Role,
     is_demo: bool = False,
     user_id: uuid.UUID | None = None,
-) -> User:
+) -> uuid.UUID:
+    """Create the user in the session's organisation if the email is new. Returns the user's id."""
     email = normalise_email(email)
     user = session.scalar(select(User).where(User.email == email))
     if user is None:
@@ -88,7 +92,7 @@ def ensure_user(
             user.id = user_id
         session.add(user)
         session.flush()
-    return user
+    return user.id
 
 
 def _to_current(user: User, organisation: Organisation) -> CurrentUser:
@@ -111,23 +115,52 @@ def current_user_for(session: Session, user: User) -> CurrentUser:
 # --- one-time codes ---------------------------------------------------------
 
 
-def request_code(session: Session, raw_email: str) -> None:
-    """Email a sign-in code. Says nothing to the caller about whether the account exists."""
+def _failures_since(session: Session, email: str, since: datetime) -> int:
+    return session.scalar(
+        select(func.coalesce(func.sum(LoginCode.attempts), 0)).where(
+            LoginCode.email == email, LoginCode.created_at > since
+        )
+    ) or 0
+
+
+def is_locked_out(session: Session, email: str) -> bool:
+    """Too many wrong codes for this email in the lockout window (stops slow guessing)."""
     settings = get_settings()
-    email = normalise_email(raw_email)
+    since = clock.now() - timedelta(hours=settings.login_lockout_hours)
+    return _failures_since(session, email, since) >= settings.login_max_failures_per_day
+
+
+def send_code(session: Session, email: str) -> None:
+    """Email a sign-in code, if the account exists (or sign-up is open) and no limit is reached.
+
+    Runs in the worker (identity.tasks), never inside the web request: the request only
+    puts a job on the queue, so its timing is the same whether or not the account exists.
+    """
+    settings = get_settings()
+    email = normalise_email(email)
     now = clock.now()
 
     known = session.scalar(select(User.id).where(User.email == email)) is not None
     if not known and not settings.signup_is_open:
         return
 
-    window_start = now - timedelta(minutes=settings.login_code_minutes)
-    recent = session.scalar(
-        select(func.count())
-        .select_from(LoginCode)
-        .where(LoginCode.email == email, LoginCode.created_at > window_start)
-    )
-    if (recent or 0) >= settings.login_code_max_requests:
+    def codes_since(since: datetime) -> int:
+        return session.scalar(
+            select(func.count())
+            .select_from(LoginCode)
+            .where(LoginCode.email == email, LoginCode.created_at > since)
+        ) or 0
+
+    if codes_since(now - timedelta(minutes=settings.login_code_minutes)) >= (
+        settings.login_code_max_requests
+    ):
+        return
+    day_start = now - timedelta(hours=settings.login_lockout_hours)
+    if codes_since(day_start) >= settings.login_max_codes_per_day:
+        log.info("daily limit of sign-in codes reached for one address")
+        return
+    if is_locked_out(session, email):
+        log.info("sign-in codes paused for one address after too many wrong codes")
         return
 
     code = security.new_login_code()
@@ -151,7 +184,7 @@ def request_code(session: Session, raw_email: str) -> None:
             ),
         )
     except OSError:
-        # Do not reveal anything to the caller; the operator sees it in the log.
+        # The operator sees it in the log; the person can ask for a new code.
         log.exception("could not send the sign-in email")
 
 
@@ -176,6 +209,9 @@ def verify_code(session: Session, raw_email: str, code: str) -> User:
         .with_for_update()
     )
     if login_code is None or login_code.attempts >= settings.login_code_max_attempts:
+        raise SignInError
+    # Even the right code is refused while the address is locked out.
+    if is_locked_out(session, email):
         raise SignInError
     if not security.same(login_code.code_hash, security.hash_login_code(email, code.strip())):
         login_code.attempts += 1
