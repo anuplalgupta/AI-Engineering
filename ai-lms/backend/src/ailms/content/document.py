@@ -5,7 +5,7 @@ Text is Markdown. Maths is LaTeX inside $...$ (inline) and $$...$$ (display).
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 FORMAT_VERSION = 1
 
@@ -21,28 +21,33 @@ SectionType = Literal[
 ]
 
 
-class Source(BaseModel):
+class _DocModel(BaseModel):
+    # Fields with defaults are always sent, so the API description marks them required.
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
+class Source(_DocModel):
     source_title: str
     pages: list[int] = Field(default_factory=list)
 
 
-class Step(BaseModel):
+class Step(_DocModel):
     id: str
     body_md: str
 
 
-class Image(BaseModel):
+class Image(_DocModel):
     key: str
     alt: str
     caption: str
 
 
-class Table(BaseModel):
+class Table(_DocModel):
     headers: list[str]
     rows: list[list[str]]
 
 
-class Section(BaseModel):
+class Section(_DocModel):
     # Stable across versions of a lesson, so a student's place survives an edit.
     id: str = Field(min_length=1, max_length=80)
     type: SectionType
@@ -74,7 +79,7 @@ class Section(BaseModel):
         return self
 
 
-class LessonDocument(BaseModel):
+class LessonDocument(_DocModel):
     schema_version: Literal[1]
     sections: list[Section] = Field(min_length=1)
 

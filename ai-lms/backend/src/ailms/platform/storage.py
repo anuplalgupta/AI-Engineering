@@ -11,6 +11,7 @@ from minio import Minio
 from minio.error import S3Error
 
 from ailms.platform.settings import get_settings
+from ailms.platform.svg import clean_svg
 
 
 @dataclass(frozen=True)
@@ -127,3 +128,10 @@ def organisation_key(organisation_id: uuid.UUID, key: str) -> str:
     if not is_valid_media_key(key):
         raise ValueError(f"not a valid media key: {key!r}")
     return f"org/{organisation_id}/{key}"
+
+
+def store_file(storage: Storage, key: str, data: bytes, content_type: str) -> None:
+    """Store a file, cleaning SVG images first so that no script inside one survives."""
+    if content_type.split(";")[0].strip().lower() == "image/svg+xml":
+        data = clean_svg(data)
+    storage.put(key, data, content_type)

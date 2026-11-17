@@ -1,141 +1,38 @@
-// Hand-written types for the M1 API contract.
-// This is the only file with hand-written API types: once ../backend/openapi.json
-// exists, run `npm run gen:api` and re-export the generated types from here.
+// API types for the M1 contract, taken from the generated schema.gen.ts.
+// After a backend route changes: export ../backend/openapi.json, run `npm run gen:api`,
+// then fix any type errors here. This is the only file that names API types by hand.
+import type { components } from "./schema.gen";
 
-export type Role = "admin" | "reviewer" | "student";
+type Schemas = components["schemas"];
 
-export interface Health {
-  status: "ok";
-  version: string;
-}
+export type Health = Schemas["HealthOut"];
+export type AppConfig = Schemas["ConfigOut"];
+export type Organisation = Schemas["OrganisationOut"];
+export type User = Schemas["UserOut"];
+export type Role = User["role"];
 
-export interface AppConfig {
-  demo_mode: boolean;
-  signup_open: boolean;
-  access_code_required: boolean;
-  banner: string | null;
-}
+export type RequestCodeBody = Schemas["RequestCodeIn"];
+export type VerifyCodeBody = Schemas["VerifyCodeIn"];
+export type DemoLoginBody = Schemas["DemoLoginIn"];
+export type AuthResponse = Schemas["SignedInOut"];
 
-export interface Organisation {
-  id: string;
-  name: string;
-}
+export type ProgrammeRef = Schemas["ProgrammeOut"];
+export type Course = Schemas["CourseOut"];
+export type TopicLesson = Schemas["TopicLessonOut"];
+export type Topic = Schemas["TopicOut"];
 
-export interface User {
-  id: string;
-  email: string;
-  display_name: string;
-  role: Role;
-  organisation: Organisation;
-}
+// The server always sends these keys (null when unused); the contract and the
+// reader treat them as optional, so fixtures and older documents may leave them out.
+type OptionalSectionKeys = "title" | "body_md" | "steps" | "image" | "table" | "items";
+export type Section = Omit<Schemas["Section"], OptionalSectionKeys> &
+  Partial<Pick<Schemas["Section"], OptionalSectionKeys>>;
+export type SectionType = Section["type"];
+export type SectionStep = Schemas["Step"];
+export type SectionImage = Schemas["Image"];
+export type SectionTable = Schemas["Table"];
+export type SectionSource = Schemas["Source"];
+export type LessonDocument = Omit<Schemas["LessonDocument"], "sections"> & { sections: Section[] };
+export type Lesson = Omit<Schemas["LessonOut"], "document"> & { document: LessonDocument };
+export type LessonFormat = Lesson["format"];
 
-export interface RequestCodeBody {
-  email: string;
-}
-
-export interface VerifyCodeBody {
-  email: string;
-  code: string;
-}
-
-export interface DemoLoginBody {
-  role: Role;
-  access_code?: string;
-}
-
-export interface AuthResponse {
-  user: User;
-}
-
-export interface ProgrammeRef {
-  id: string;
-  title: string;
-}
-
-export interface Course {
-  id: string;
-  title: string;
-  subject: string;
-  level: string;
-  programme: ProgrammeRef;
-}
-
-export type LessonFormat = "tutorial";
-
-export interface TopicLesson {
-  id: string;
-  format: string;
-  title: string;
-  estimated_minutes: number;
-}
-
-export interface Topic {
-  id: string;
-  parent_id: string | null;
-  title: string;
-  position: number;
-  lesson: TopicLesson | null;
-}
-
-export type SectionType =
-  | "explanation"
-  | "derivation"
-  | "worked_example"
-  | "diagram"
-  | "table"
-  | "key_points"
-  | "common_mistakes"
-  | "summary";
-
-export interface SectionStep {
-  id: string;
-  body_md: string;
-}
-
-export interface SectionImage {
-  key: string;
-  alt: string;
-  caption: string;
-}
-
-export interface SectionTable {
-  headers: string[];
-  rows: string[][];
-}
-
-export interface SectionSource {
-  source_title: string;
-  pages: number[];
-}
-
-export interface Section {
-  id: string;
-  type: SectionType;
-  title?: string | null;
-  body_md?: string | null;
-  steps?: SectionStep[] | null;
-  image?: SectionImage | null;
-  table?: SectionTable | null;
-  items?: string[] | null;
-  sources: SectionSource[];
-}
-
-export interface LessonDocument {
-  schema_version: 1;
-  sections: Section[];
-}
-
-export interface Lesson {
-  id: string;
-  topic_id: string;
-  title: string;
-  format: LessonFormat;
-  version: number;
-  estimated_minutes: number;
-  attribution: string | null;
-  document: LessonDocument;
-}
-
-export interface ErrorBody {
-  detail: string;
-}
+export type ErrorBody = Schemas["ErrorOut"];

@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,8 +29,16 @@ class LessonStatus(StrEnum):
     FAILED = "failed"
 
 
+def _one_of(column: str, values: type[StrEnum]) -> str:
+    return f"{column} IN ({', '.join(repr(v.value) for v in values)})"
+
+
 class Lesson(OrganisationOwned, Base):
     __tablename__ = "lesson"
+    __table_args__ = (
+        CheckConstraint(_one_of("format", LessonFormat), name="format"),
+        CheckConstraint(_one_of("status", LessonStatus), name="status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
     topic_id: Mapped[uuid.UUID] = mapped_column(

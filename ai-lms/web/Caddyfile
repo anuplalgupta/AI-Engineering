@@ -2,6 +2,10 @@
 	# Plain HTTP inside the Compose network. TLS, when hosted, ends in front of this container.
 	admin off
 	auto_https off
+	servers {
+		# Keep X-Forwarded-Proto/-For from a TLS proxy on a private network in front of us.
+		trusted_proxies static private_ranges
+	}
 }
 
 :80 {
@@ -9,7 +13,10 @@
 
 	header {
 		# Only this origin may supply scripts, styles, fonts, images and connections.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# style-src-attr allows the inline style attributes KaTeX uses to position maths;
+		# attributes cannot run script. "?" keeps a stricter policy the backend sets
+		# (for example the sandbox on an SVG from /api/media).
+		?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -24,9 +31,10 @@
 		respond "ok" 200
 	}
 
-	# The backend sets its own cache headers.
+	# The backend sets its own cache headers. Caddy adds X-Forwarded-For, -Host and -Proto
+	# (the scheme the browser used, passed through from a trusted proxy in front).
 	handle /api/* {
-		reverse_proxy backend:8000
+		reverse_proxy http://backend:8000
 	}
 
 	# File names under /assets carry a content hash, so they can be cached for a year.

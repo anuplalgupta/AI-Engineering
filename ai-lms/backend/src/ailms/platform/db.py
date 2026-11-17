@@ -117,11 +117,7 @@ def _apply_organisation_filter(state: ORMExecuteState) -> None:
     organisation_id = state.session.info.get(_ORG_KEY)
     if organisation_id is None:
         raise UnscopedQueryError(f"query on {names} with no organisation set")
-    filterable = (
-        (state.is_select or state.is_update or state.is_delete)
-        and state.is_orm_statement
-        and bool(state.all_mappers)
-    )
+    filterable = (state.is_select or state.is_update or state.is_delete) and state.is_orm_statement
     if not filterable:
         # Plain inserts and table-level statements cannot be filtered automatically.
         raise UnscopedQueryError(

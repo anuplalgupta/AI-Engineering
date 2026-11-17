@@ -267,6 +267,12 @@ a {
   gap: 0.3rem;
   margin-bottom: 0.9rem;
 }
+.field--spaced {
+  margin-top: 0.9rem;
+}
+.stack--spaced {
+  margin-top: 0.5rem;
+}
 .field label {
   font-size: 0.92rem;
   font-weight: 600;

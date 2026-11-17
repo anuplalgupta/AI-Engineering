@@ -1,0 +1,115 @@
+name: AI-LMS
+
+on:
+  push:
+    paths:
+      - "ai-lms/**"
+      - ".github/workflows/ai-lms.yml"
+  pull_request:
+    paths:
+      - "ai-lms/**"
+      - ".github/workflows/ai-lms.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-lms-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE: docker compose -p ailms -f ai-lms/deploy/compose.yaml
+
+jobs:
+  backend:
+    name: Backend tests, module boundaries, API contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write throwaway secrets
+        run: sh ai-lms/deploy/setup.sh
+      - name: Build the backend image
+        run: $COMPOSE build backend
+      - name: Start the database, object store and mail viewer
+        run: $COMPOSE up -d --wait db objectstore mail
+      - name: Module boundaries
+        run: $COMPOSE run --rm --no-deps backend lint-imports --no-cache
+      - name: OpenAPI description matches the code
+        run: $COMPOSE run --rm --no-deps backend python -m ailms.tools.openapi --check
+      - name: Tests (in a throwaway database)
+        run: $COMPOSE run --rm --no-deps backend pytest
+      - name: Start the backend and worker and check health
+        run: |
+          $COMPOSE up -d --wait backend worker
+          $COMPOSE exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/api/health').read().decode())"
+      - name: Logs on failure
+        if: failure()
+        run: $COMPOSE logs --no-color
+      - name: Clean up
+        if: always()
+        run: $COMPOSE down -v
+
+  web:
+    name: Web typecheck, tests, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ai-lms/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.18.1"
+          cache: npm
+          cache-dependency-path: ai-lms/web/package-lock.json
+      - run: npm ci --no-audit
+      - name: Generated API types match openapi.json
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/api/schema.gen.ts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  images:
+    name: Publish images
+    needs: [backend, web]
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image names (the registry needs lower case)
+        id: names
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ailms" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ai-lms
+          file: ai-lms/backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.names.outputs.prefix }}-backend:latest
+            ${{ steps.names.outputs.prefix }}-backend:${{ github.sha }}
+      - name: Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ai-lms/web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.names.outputs.prefix }}-web:latest
+            ${{ steps.names.outputs.prefix }}-web:${{ github.sha }}

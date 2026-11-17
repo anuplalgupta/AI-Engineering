@@ -39,7 +39,8 @@ function remarkDoubleDollarDisplay() {
 const remarkPlugins: MarkdownOptions["remarkPlugins"] = [remarkMath, remarkDoubleDollarDisplay];
 const rehypePlugins: MarkdownOptions["rehypePlugins"] = [
   [rehypeSanitize, sanitizeSchema],
-  [rehypeKatex, { throwOnError: false, strict: "ignore", errorColor: "#b42318" }],
+  // trust: false keeps \href, \includegraphics and similar commands switched off.
+  [rehypeKatex, { trust: false, throwOnError: false, strict: "ignore", errorColor: "#b42318" }],
 ];
 
 function ExternalLink({ href, children }: { href?: string; children?: ReactNode }) {

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
 
     sample_data_dir: Path = Path("/app/sample-data")
 
+    # Hosts whose X-Forwarded-Proto header is believed: the web server container only.
+    trusted_proxy_hosts: list[str] = ["web"]
+
     @model_validator(mode="after")
     def _check(self) -> "Settings":
         if len(self.secret_key) < 32:

@@ -46,13 +46,29 @@ def migrate() -> None:
     command.upgrade(config, "head")
 
 
+# Any fixed number; every container that prepares the database takes this lock first.
+_PREPARE_LOCK = 4_171_002_001
+
+
+def prepare() -> None:
+    """Migrate and load the sample data. Safe when two containers start at once."""
+    with get_engine().connect() as connection:
+        connection.execute(text("select pg_advisory_lock(:key)"), {"key": _PREPARE_LOCK})
+        connection.commit()
+        try:
+            migrate()
+            log.info("database is up to date")
+            _wait_for("the object store", get_storage().ensure_bucket)
+            seed.main()
+        finally:
+            connection.execute(text("select pg_advisory_unlock(:key)"), {"key": _PREPARE_LOCK})
+            connection.commit()
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     _wait_for("the database", _ping_database)
-    migrate()
-    log.info("database is up to date")
-    _wait_for("the object store", get_storage().ensure_bucket)
-    seed.main()
+    prepare()
     log.info("ready")
 
 

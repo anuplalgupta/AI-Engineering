@@ -1,0 +1,124 @@
+# AI-LMS on one machine. Run the setup script once, then:
+#   docker compose -p ailms -f ai-lms/deploy/compose.yaml up -d
+# Only the web app (8080) and the mail viewer (8025) are reachable, and only from this computer.
+name: ailms
+
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql+psycopg://ailms:${POSTGRES_PASSWORD:?Run the setup script first (see ai-lms/docs/guide.md)}@db:5432/ailms
+  SECRET_KEY: ${SECRET_KEY:?Run the setup script first}
+  S3_ENDPOINT: http://objectstore:7070
+  S3_ACCESS_KEY: ${OBJECTSTORE_ACCESS_KEY:?Run the setup script first}
+  S3_SECRET_KEY: ${OBJECTSTORE_SECRET_KEY:?Run the setup script first}
+  S3_BUCKET: ailms
+  SMTP_HOST: mail
+  SMTP_PORT: "1025"
+  MAIL_FROM: ${MAIL_FROM:-AI-LMS <no-reply@ailms.invalid>}
+  DEMO_MODE: ${DEMO_MODE:-false}
+  PUBLIC_DEMO: ${PUBLIC_DEMO:-false}
+  DEMO_ACCESS_CODE: ${DEMO_ACCESS_CODE:-}
+  SIGNUP_OPEN: ${SIGNUP_OPEN:-false}
+
+x-backend-build: &backend-build
+  context: ..
+  dockerfile: backend/Dockerfile
+  secrets: [extra_ca]
+
+services:
+  web:
+    build:
+      context: ../web
+      secrets: [extra_ca]
+    image: ${AILMS_IMAGE_PREFIX:-ailms}-web:${AILMS_TAG:-local}
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build: *backend-build
+    image: ${AILMS_IMAGE_PREFIX:-ailms}-backend:${AILMS_TAG:-local}
+    environment: *backend-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    # The image's health check calls /api/health; the first start also migrates and seeds.
+    restart: unless-stopped
+
+  worker:
+    build: *backend-build
+    image: ${AILMS_IMAGE_PREFIX:-ailms}-backend:${AILMS_TAG:-local}
+    command: ["procrastinate", "--app=ailms.platform.queue.app", "worker"]
+    environment: *backend-environment
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "procrastinate", "--app=ailms.platform.queue.app", "healthchecks"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:0.8.0-pg16
+    environment:
+      POSTGRES_USER: ailms
+      POSTGRES_DB: ailms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run the setup script first}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ailms -d ailms"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    restart: unless-stopped
+
+  # S3-compatible object store (Versity S3 Gateway, Apache 2.0), storing files in a volume.
+  objectstore:
+    image: versity/versitygw:v1.11.0
+    entrypoint:
+      - sh
+      - -c
+      - mkdir -p /data/objects /data/meta && exec versitygw --port :7070 --health /health --quiet posix --sidecar /data/meta /data/objects
+    environment:
+      ROOT_ACCESS_KEY: ${OBJECTSTORE_ACCESS_KEY:?Run the setup script first}
+      ROOT_SECRET_KEY: ${OBJECTSTORE_SECRET_KEY:?Run the setup script first}
+    volumes:
+      - object-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:7070/health"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # Local mail viewer: sign-in emails are caught here and never leave the computer.
+  mail:
+    image: axllent/mailpit:v1.27.11
+    user: "65534:65534"
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_MAX_MESSAGES: "500"
+      # No calls to the internet: no update check, no relay.
+      MP_DISABLE_VERSION_CHECK: "true"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  object-data:
+
+secrets:
+  # Only for building the images on a network that inspects HTTPS; see the guide.
+  extra_ca:
+    file: ${AILMS_EXTRA_CA:-./no-extra-ca.pem}

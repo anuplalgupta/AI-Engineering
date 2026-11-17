@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from starlette.exceptions import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
@@ -13,6 +14,7 @@ from ailms.catalog.api import router as catalog_router
 from ailms.content.api import router as content_router
 from ailms.identity.api import router as identity_router
 from ailms.platform import queue
+from ailms.platform.proxy import TrustedProxyMiddleware
 from ailms.platform.settings import get_settings
 
 
@@ -51,8 +53,16 @@ def create_app() -> FastAPI:
             parts.append(f"{where}: {item['msg']}" if where else item["msg"])
         return JSONResponse(status_code=422, content={"detail": "; ".join(parts) or "Invalid request."})
 
+    @app.exception_handler(HTTPException)
+    async def _http_error(request: Request, error: HTTPException) -> JSONResponse:
+        detail = error.detail if isinstance(error.detail, str) else "Request failed."
+        return JSONResponse(
+            status_code=error.status_code, content={"detail": detail}, headers=error.headers
+        )
+
     for router in (system_routes.router, identity_router, catalog_router, content_router):
         app.include_router(router, prefix="/api")
+    app.add_middleware(TrustedProxyMiddleware, trusted_hosts=get_settings().trusted_proxy_hosts)
     return app
 
 

@@ -169,7 +169,7 @@ function EmailCodeSignIn({ signupOpen }: { signupOpen: boolean }) {
               . Nothing is sent outside this machine.
             </p>
           ) : null}
-          <div className="field" style={{ marginTop: "0.9rem" }}>
+          <div className="field field--spaced">
             <label htmlFor={codeId}>One-time code</label>
             <input
               id={codeId}
@@ -192,7 +192,7 @@ function EmailCodeSignIn({ signupOpen }: { signupOpen: boolean }) {
           <button type="submit" className="button button--primary button--block" disabled={busy}>
             {busy ? "Checking…" : "Sign in"}
           </button>
-          <div className="stack" style={{ marginTop: "0.5rem" }}>
+          <div className="stack stack--spaced">
             <button type="button" className="button button--link" disabled={busy} onClick={() => void sendCode()}>
               Send a new code
             </button>
