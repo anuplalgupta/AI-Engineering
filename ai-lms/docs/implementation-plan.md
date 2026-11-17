@@ -432,7 +432,7 @@ No language model, free components only (X-7, X-8).
 
 ## Decisions needed
 
-The build is proceeding on the recommended answer to each (owner's go-ahead, 2026-11-16). They remain open to change; a different answer changes the milestone named.
+The build is proceeding on the recommended answer to each (owner's go-ahead, 2026-11-16). They remain open to change, except where marked as decided; a different answer changes the milestone named.
 
 | # | Question | Recommended answer | Affects |
 |---|---|---|---|
@@ -446,6 +446,7 @@ The build is proceeding on the recommended answer to each (owner's go-ahead, 202
 | 8 | "Error reports per 100 lessons" is a pilot measure, but reporting a mistake (V-9) is P1. | Build V-9 in M15. | M15 |
 | 9 | Can a student's plan cover one course in the first release? The data model supports several. | Yes | M8 |
 | 10 | Which chapters of the open textbook form the sample course? | Needs the owner or the subject expert. | M2 |
+| 11 | Which S3-compatible object store runs locally? ADR 0002 names MinIO only as an example; its image is no longer on Docker Hub. | **Decided by the owner (2026-11-17): Versity S3 Gateway** (`versity/versitygw`, Apache 2.0). The backend reaches it through the S3 interface, so any S3-compatible store, or a hosted bucket, replaces it through settings alone. | M1 |
 
 ## Left out of this plan
 
