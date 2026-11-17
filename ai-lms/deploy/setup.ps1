@@ -5,12 +5,6 @@ param([switch]$PublicDemo)
 $ErrorActionPreference = 'Stop'
 
 $envFile = Join-Path $PSScriptRoot '.env'
-if (Test-Path $envFile) {
-    Write-Host "$envFile already exists, so nothing was changed."
-    Write-Host 'It holds the passwords for your existing data. To start again from nothing, see'
-    Write-Host '"Wipe everything" in ai-lms\docs\guide.md.'
-    exit 1
-}
 
 function New-RandomHex([int]$bytes) {
     $buffer = New-Object byte[] $bytes
@@ -18,6 +12,22 @@ function New-RandomHex([int]$bytes) {
     $rng.GetBytes($buffer)
     $rng.Dispose()
     return -join ($buffer | ForEach-Object { $_.ToString('x2') })
+}
+
+if (Test-Path $envFile) {
+    # A file from an earlier version may lack a newer setting: add it, change nothing else.
+    if (-not (Select-String -Path $envFile -Pattern '^APP_DB_PASSWORD=' -Quiet)) {
+        $text = [System.IO.File]::ReadAllText($envFile)
+        if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += "`n" }
+        $text += "APP_DB_PASSWORD=$(New-RandomHex 24)`n"
+        [System.IO.File]::WriteAllText($envFile, $text, (New-Object System.Text.UTF8Encoding $false))
+        Write-Host "Added the new setting APP_DB_PASSWORD to $envFile; nothing else was changed."
+        exit 0
+    }
+    Write-Host "$envFile already exists, so nothing was changed."
+    Write-Host 'It holds the passwords for your existing data. To start again from nothing, see'
+    Write-Host '"Wipe everything" in ai-lms\docs\guide.md.'
+    exit 1
 }
 
 if ($PublicDemo) {
@@ -34,6 +44,7 @@ $lines = @(
     '# Written by setup.ps1. Keep this file private and never commit it.'
     '# Deleting it does not delete your data, but the data cannot be opened without it.'
     "POSTGRES_PASSWORD=$(New-RandomHex 24)"
+    "APP_DB_PASSWORD=$(New-RandomHex 24)"
     "SECRET_KEY=$(New-RandomHex 32)"
     "OBJECTSTORE_ACCESS_KEY=ailms$(New-RandomHex 8)"
     "OBJECTSTORE_SECRET_KEY=$(New-RandomHex 24)"

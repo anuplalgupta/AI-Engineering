@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKeyConstraint, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ailms.platform import clock
@@ -21,7 +21,10 @@ class Organisation(Base):
 
 class User(OrganisationOwned, Base):
     __tablename__ = "user_account"
-    __table_args__ = (UniqueConstraint("organisation_id", "email"),)
+    __table_args__ = (
+        UniqueConstraint("organisation_id", "email"),
+        UniqueConstraint("id", "organisation_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(254))
@@ -33,11 +36,17 @@ class User(OrganisationOwned, Base):
 
 class UserSession(OrganisationOwned, Base):
     __tablename__ = "user_session"
+    __table_args__ = (
+        # The user belongs to the same organisation as the session.
+        ForeignKeyConstraint(
+            ["user_id", "organisation_id"],
+            ["user_account.id", "user_account.organisation_id"],
+            ondelete="CASCADE",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_id)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("user_account.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(default=clock.now)
     expires_at: Mapped[datetime] = mapped_column()

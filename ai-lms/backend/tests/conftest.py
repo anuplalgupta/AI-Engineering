@@ -19,7 +19,10 @@ from psycopg import sql
 
 # --- point the application at a throwaway database, before it is imported -----
 
-_BASE_URL = os.environ["DATABASE_URL"]
+# The application's role (no superuser rights) runs the code under test, as in the stack;
+# the schema owner creates, migrates, empties and drops the throwaway database.
+_APP_URL = os.environ["DATABASE_URL"]
+_ADMIN_URL = os.environ.get("ADMIN_DATABASE_URL") or _APP_URL
 _TEST_DB = f"ailms_test_{uuid.uuid4().hex[:12]}"
 
 
@@ -31,7 +34,8 @@ def _libpq(url: str) -> str:
     return url.replace("postgresql+psycopg://", "postgresql://", 1)
 
 
-os.environ["DATABASE_URL"] = _with_database(_BASE_URL, _TEST_DB)
+os.environ["DATABASE_URL"] = _with_database(_APP_URL, _TEST_DB)
+os.environ["ADMIN_DATABASE_URL"] = _with_database(_ADMIN_URL, _TEST_DB)
 # Fixed settings, whatever the deployment's .env says. Tests change them with monkeypatch.
 os.environ.update(
     {
@@ -45,14 +49,19 @@ os.environ.update(
 
 from ailms.platform import clock as clock_module  # noqa: E402
 from ailms.platform import mail, storage  # noqa: E402
-from ailms.platform.db import get_engine, scope_to_organisation, session_scope  # noqa: E402
+from ailms.platform.db import (  # noqa: E402
+    get_admin_engine,
+    get_engine,
+    scope_to_organisation,
+    session_scope,
+)
 from ailms.platform.settings import Settings, get_settings  # noqa: E402
 
 START = datetime(2026, 11, 16, 9, 0, tzinfo=UTC)
 
 
 def _admin_connection() -> psycopg.Connection:
-    return psycopg.connect(_libpq(_with_database(_BASE_URL, "postgres")), autocommit=True)
+    return psycopg.connect(_libpq(_with_database(_ADMIN_URL, "postgres")), autocommit=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -60,12 +69,13 @@ def test_database() -> Iterator[str]:
     with _admin_connection() as conn:
         conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(_TEST_DB)))
     try:
-        from ailms.bootstrap import migrate
+        from ailms.bootstrap import prepare_database
 
-        migrate()
+        prepare_database()
         yield _TEST_DB
     finally:
         get_engine().dispose()
+        get_admin_engine().dispose()
         with _admin_connection() as conn:
             conn.execute(
                 sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(_TEST_DB))
@@ -73,7 +83,7 @@ def test_database() -> Iterator[str]:
 
 
 def _all_tables() -> list[str]:
-    with get_engine().connect() as conn:
+    with get_admin_engine().connect() as conn:
         rows = conn.exec_driver_sql(
             "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() "
             "AND tablename <> 'alembic_version' "
@@ -87,7 +97,7 @@ def clean_database(test_database: str) -> Iterator[None]:
     yield
     tables = _all_tables()
     if tables:
-        with get_engine().begin() as conn:
+        with get_admin_engine().begin() as conn:
             conn.exec_driver_sql(
                 "TRUNCATE " + ", ".join(f'"{t}"' for t in tables) + " RESTART IDENTITY CASCADE"
             )
@@ -163,7 +173,9 @@ def sign_in_as(client, organisation_id: uuid.UUID, email: str) -> None:
     """Give the client a session cookie for a user of any organisation."""
     from sqlalchemy import select
 
-    from ailms.identity.api import SESSION_COOKIE, User, start_session
+    from ailms.identity.api import SESSION_COOKIE
+    from ailms.identity.models import User
+    from ailms.identity.service import start_session
 
     with session_scope() as session:
         scope_to_organisation(session, organisation_id)
@@ -177,3 +189,15 @@ def demo_login(client, role: str) -> dict:
     response = client.post("/api/auth/demo-login", json={"role": role})
     assert response.status_code == 200, response.text
     return response.json()["user"]
+
+
+def run_jobs() -> None:
+    """Run every job waiting on the queue, as the worker would, then return."""
+    from procrastinate import PsycopgConnector
+
+    from ailms.platform.queue import _conninfo
+    from ailms.worker import app as worker_app
+
+    # A copy with its own connection, so the web app's queue stays open afterwards.
+    worker = worker_app.with_connector(PsycopgConnector(conninfo=_conninfo()))
+    worker.run_worker(wait=False, install_signal_handlers=False, listen_notify=False)

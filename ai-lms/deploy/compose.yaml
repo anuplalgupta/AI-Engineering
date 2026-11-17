@@ -4,7 +4,9 @@
 name: ailms
 
 x-backend-environment: &backend-environment
-  DATABASE_URL: postgresql+psycopg://ailms:${POSTGRES_PASSWORD:?Run the setup script first (see ai-lms/docs/guide.md)}@db:5432/ailms
+  # The application's own database role: no superuser rights, so row-level security applies.
+  # The backend's start-up creates it (as the owner below) with this password.
+  DATABASE_URL: postgresql+psycopg://ailms_app:${APP_DB_PASSWORD:?Run the setup script first (see ai-lms/docs/guide.md)}@db:5432/ailms
   SECRET_KEY: ${SECRET_KEY:?Run the setup script first}
   S3_ENDPOINT: http://objectstore:7070
   S3_ACCESS_KEY: ${OBJECTSTORE_ACCESS_KEY:?Run the setup script first}
@@ -39,7 +41,11 @@ services:
   backend:
     build: *backend-build
     image: ${AILMS_IMAGE_PREFIX:-ailms}-backend:${AILMS_TAG:-local}
-    environment: *backend-environment
+    environment:
+      <<: *backend-environment
+      # The schema owner, for start-up only (migrations, the role above, its rights).
+      # The image's command removes it before the web server starts; the worker never has it.
+      ADMIN_DATABASE_URL: postgresql+psycopg://ailms:${POSTGRES_PASSWORD:?Run the setup script first}@db:5432/ailms
     depends_on:
       db:
         condition: service_healthy
@@ -53,13 +59,13 @@ services:
   worker:
     build: *backend-build
     image: ${AILMS_IMAGE_PREFIX:-ailms}-backend:${AILMS_TAG:-local}
-    command: ["procrastinate", "--app=ailms.platform.queue.app", "worker"]
+    command: ["procrastinate", "--app=ailms.worker.app", "worker"]
     environment: *backend-environment
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "procrastinate", "--app=ailms.platform.queue.app", "healthchecks"]
+      test: ["CMD", "procrastinate", "--app=ailms.worker.app", "healthchecks"]
       interval: 30s
       timeout: 10s
       start_period: 20s
@@ -69,6 +75,7 @@ services:
   db:
     image: pgvector/pgvector:0.8.0-pg16
     environment:
+      # The cluster's superuser and owner of the schema. Only start-up uses it.
       POSTGRES_USER: ailms
       POSTGRES_DB: ailms
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run the setup script first}

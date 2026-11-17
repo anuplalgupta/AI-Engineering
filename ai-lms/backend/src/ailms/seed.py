@@ -21,7 +21,7 @@ from ailms.identity.api import (
     any_organisation_exists,
     ensure_organisation,
     ensure_user,
-    organisation_by_slug,
+    organisation_id_by_slug,
 )
 from ailms.platform.db import scope_to_organisation, session_scope
 from ailms.platform.settings import get_settings
@@ -59,13 +59,13 @@ def load_sample_data(
     seed = read_seed(data_dir)
 
     slug = organisation_slug or seed["organisation"]["slug"]
-    organisation = ensure_organisation(
+    organisation_id = ensure_organisation(
         session,
         organisation_id=seed_id("organisation", slug),
         slug=slug,
         name=organisation_name or seed["organisation"]["name"],
     )
-    scope_to_organisation(session, organisation.id)
+    scope_to_organisation(session, organisation_id)
 
     def sid(kind: str, key: str) -> uuid.UUID:
         return seed_id(kind, f"{slug}/{key}")
@@ -102,7 +102,7 @@ def load_sample_data(
         ],
     )
 
-    restore_missing_media(organisation.id, data_dir, storage)
+    restore_missing_media(organisation_id, data_dir, storage)
 
     for item in seed["lessons"]:
         lesson = json.loads((data_dir / item["file"]).read_text(encoding="utf-8"))
@@ -118,7 +118,7 @@ def load_sample_data(
             publish=True,
             comment="Included sample data",
         )
-    return organisation.id
+    return organisation_id
 
 
 def restore_missing_media(
@@ -137,9 +137,11 @@ def main() -> None:
     """Load the sample data if the database has no organisation yet."""
     with session_scope() as session:
         if any_organisation_exists(session):
-            existing = organisation_by_slug(session, get_settings().default_organisation_slug)
+            existing = organisation_id_by_slug(
+                session, get_settings().default_organisation_slug
+            )
             if existing is not None:
-                restore_missing_media(existing.id)
+                restore_missing_media(existing)
             log.info("the database already has data; sample data not loaded again")
             return
         load_sample_data(session)

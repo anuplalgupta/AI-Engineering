@@ -6,8 +6,10 @@ import pytest
 from sqlalchemy import select
 
 from ailms import __version__
-from ailms.catalog.api import Topic
-from ailms.content.api import Lesson, LessonStatus, import_tutorial
+from ailms.catalog.models import Topic
+from ailms.content.api import VersionStatus, import_tutorial
+from ailms.content.models import Lesson, LessonVersion
+from ailms.content.service import add_version, set_version_status, withdraw_lesson
 from ailms.platform.db import scope_to_organisation, session_scope, system_scope
 from ailms.platform.storage import organisation_key
 from conftest import demo_login, sign_in_as
@@ -116,14 +118,76 @@ def test_students_never_get_unpublished_lessons(client, orgs):
     assert client.get(f"/api/lessons/{draft_id}").status_code == 200
 
 
-@pytest.mark.parametrize("status", [s for s in LessonStatus if s is not LessonStatus.PUBLISHED])
-def test_withdrawn_or_other_status_hidden_from_students(client, orgs, status):
+def test_withdrawn_lesson_hidden_from_students(client, orgs):
     demo_login(client, "student")
     lesson_id = _published_lesson_id(client)
     with session_scope() as session:
         scope_to_organisation(session, orgs.a)
-        session.get(Lesson, uuid.UUID(lesson_id)).status = status.value
+        withdraw_lesson(session, uuid.UUID(lesson_id), comment="Out of date")
     assert client.get(f"/api/lessons/{lesson_id}").status_code == 404
+    course = client.get("/api/courses").json()[0]
+    topics = client.get(f"/api/courses/{course['id']}/topics").json()
+    assert all(t["lesson"] is None for t in topics)
+
+
+def _second_version(organisation_id: uuid.UUID, lesson_id: str) -> uuid.UUID:
+    with session_scope() as session:
+        scope_to_organisation(session, organisation_id)
+        return add_version(
+            session, lesson_id=uuid.UUID(lesson_id), title="Edited title", estimated_minutes=7,
+            attribution=None, comment="Edit",
+            document={"schema_version": 1, "sections": [
+                {"id": "s1", "type": "summary", "body_md": "Edited.", "sources": []}]},
+        )
+
+
+@pytest.mark.parametrize(
+    "status", [s for s in VersionStatus if s is not VersionStatus.PUBLISHED], ids=str
+)
+def test_students_keep_the_published_version_while_an_edit_is_reviewed(client, orgs, status):
+    demo_login(client, "student")
+    lesson_id = _published_lesson_id(client)
+    original = client.get(f"/api/lessons/{lesson_id}").json()
+    version_id = _second_version(orgs.a, lesson_id)
+    with session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        if status is not VersionStatus.DRAFT:
+            set_version_status(session, version_id, status)
+    # The student still gets version 1; staff see the edit in review.
+    assert client.get(f"/api/lessons/{lesson_id}").json() == original
+    course = client.get("/api/courses").json()[0]
+    topics = client.get(f"/api/courses/{course['id']}/topics").json()
+    assert any(t["lesson"] and t["lesson"]["id"] == lesson_id for t in topics)
+    demo_login(client, "reviewer")
+    staff_view = client.get(f"/api/lessons/{lesson_id}").json()
+    assert staff_view["version"] == 2 and staff_view["title"] == "Edited title"
+
+
+def test_publishing_an_edit_replaces_the_version_students_see(client, orgs):
+    demo_login(client, "student")
+    lesson_id = _published_lesson_id(client)
+    version_id = _second_version(orgs.a, lesson_id)
+    with session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        set_version_status(session, version_id, VersionStatus.IN_REVIEW)
+        set_version_status(session, version_id, VersionStatus.PUBLISHED)
+    lesson = client.get(f"/api/lessons/{lesson_id}").json()
+    assert lesson["version"] == 2 and lesson["title"] == "Edited title"
+    # Each version's status changes are logged against that version.
+    from ailms.platform.audit import StatusChange
+
+    with session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        changes = session.scalars(
+            select(StatusChange).where(StatusChange.item_id == version_id)
+            .order_by(StatusChange.changed_at, StatusChange.new_status)
+        ).all()
+        assert {c.item_kind for c in changes} == {"lesson_version"}
+        assert [c.new_status for c in changes] == ["draft", "in_review", "published"]
+        versions = session.scalars(
+            select(LessonVersion).where(LessonVersion.lesson_id == uuid.UUID(lesson_id))
+        ).all()
+        assert sorted(v.status for v in versions) == ["published", "published"]
 
 
 def test_media_headers_keep_svg_scripts_from_running(client, orgs):

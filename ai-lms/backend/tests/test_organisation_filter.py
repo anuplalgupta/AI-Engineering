@@ -1,19 +1,25 @@
 """The organisation filter (ADR 0001 item 6): one shared layer, tested with two organisations."""
 
 import uuid
+from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import column, delete, func, insert, select, table, text, update
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from ailms.catalog.api import Course, Programme, Topic, TopicPrerequisite, list_prerequisites, list_topics
 from ailms.catalog import service as catalog_service
+from ailms.catalog.models import Course, Programme, Topic, TopicPrerequisite
+from ailms.catalog.service import list_prerequisites, list_topics
 from ailms.content import service as content_service
-from ailms.content.api import Lesson, LessonVersion
+from ailms.content.models import Lesson, LessonVersion
 from ailms.identity import service as identity_service
-from ailms.identity.api import LoginCode, Role, User, UserSession
+from ailms.identity.api import Role
+from ailms.identity.models import LoginCode, User, UserSession
 from ailms.platform.audit import StatusChange
 from ailms.platform.db import (
     OrganisationOwned,
+    get_admin_engine,
+    get_engine,
     UnscopedQueryError,
     organisation_owned_tables,
     scope_to_organisation,
@@ -102,10 +108,10 @@ def test_repository_functions_do_not_leak(orgs):
         assert courses and all(c.organisation_id == orgs.a and p.organisation_id == orgs.a for c, p in courses)
         assert content_service.published_lesson_summaries(session, b_topics) == {}
         assert identity_service.demo_user(session, Role.STUDENT, None).organisation_id == orgs.a
-        user = identity_service.ensure_user(
+        user_id = identity_service.ensure_user(
             session, email="student@demo.example", display_name="x", role=Role.STUDENT
         )
-        assert user.organisation_id == orgs.a
+        assert session.get(User, user_id).organisation_id == orgs.a
 
 
 def test_bulk_update_and_delete_are_filtered(orgs):
@@ -148,3 +154,150 @@ def test_session_cannot_switch_organisation(orgs):
 def test_mixin_is_on_every_owned_model():
     for model in OWNED:
         assert issubclass(model, OrganisationOwned)
+
+
+# --- raw SQL fails closed in the ORM layer ---------------------------------------------
+
+
+def test_raw_sql_is_refused_in_a_scoped_session(orgs):
+    with session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        with pytest.raises(UnscopedQueryError):
+            session.execute(text("select id from lesson"))
+        with pytest.raises(UnscopedQueryError):
+            session.execute(select(table("lesson", column("id"))))
+        with pytest.raises(UnscopedQueryError):
+            session.execute(select(Topic).where(text("true")))
+
+
+def test_raw_sql_is_refused_in_an_unscoped_session(orgs):
+    with session_scope() as session:
+        with pytest.raises(UnscopedQueryError):
+            session.execute(text("select 1"))
+
+
+def test_raw_sql_is_allowed_inside_system_scope(orgs):
+    with session_scope() as session, system_scope(session):
+        rows = session.execute(text("select organisation_id from lesson")).all()
+    assert {row[0] for row in rows} == {orgs.a, orgs.b}
+
+
+# --- row-level security: the database's own copy of the filter -------------------------
+
+
+def _lesson_orgs_via_connection(session) -> set:
+    # session.connection().execute skips the ORM event; only the database policy applies.
+    return {row[0] for row in session.connection().execute(text("select organisation_id from lesson"))}
+
+
+def test_sql_that_bypasses_the_orm_sees_own_organisation_only(orgs):
+    with session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        assert _lesson_orgs_via_connection(session) == {orgs.a}
+    with session_scope() as session:
+        scope_to_organisation(session, uuid.uuid4())  # an organisation with no data
+        assert _lesson_orgs_via_connection(session) == set()
+
+
+def test_sql_that_bypasses_the_orm_sees_nothing_when_unscoped(orgs):
+    with session_scope() as session:
+        assert _lesson_orgs_via_connection(session) == set()
+    with get_engine().connect() as connection:
+        assert connection.execute(text("select count(*) from lesson")).scalar() == 0
+
+
+def test_scope_set_after_the_transaction_started_reaches_the_database(orgs):
+    with session_scope() as session:
+        assert _lesson_orgs_via_connection(session) == set()
+        scope_to_organisation(session, orgs.b)
+        assert _lesson_orgs_via_connection(session) == {orgs.b}
+        with system_scope(session):
+            assert _lesson_orgs_via_connection(session) == {orgs.a, orgs.b}
+        assert _lesson_orgs_via_connection(session) == {orgs.b}
+
+
+def test_database_refuses_writing_another_organisations_row(orgs):
+    with session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        with pytest.raises(DBAPIError):
+            session.connection().execute(
+                text("insert into programme (id, title, created_at, organisation_id) "
+                     "values (:id, 'x', now(), :org)"),
+                {"id": uuid.uuid4(), "org": orgs.b},
+            )
+
+
+def test_application_role_has_no_superuser_rights():
+    with get_engine().connect() as connection:
+        row = connection.execute(
+            text("select rolsuper, rolbypassrls, rolcreatedb, rolcreaterole from pg_roles "
+                 "where rolname = current_user")
+        ).one()
+    assert tuple(row) == (False, False, False, False)
+
+
+def test_every_organisation_owned_table_has_row_level_security():
+    names = sorted(t.name for t in organisation_owned_tables())
+    with get_admin_engine().connect() as connection:
+        enabled = dict(
+            connection.execute(
+                text("select relname, relrowsecurity from pg_class where relname = any(:names)"),
+                {"names": names},
+            ).all()
+        )
+        policies = set(
+            connection.execute(
+                text("select tablename from pg_policies where policyname = 'organisation_isolation'")
+            ).scalars()
+        )
+    assert enabled == dict.fromkeys(names, True)
+    assert set(names) <= policies
+
+
+# --- links between rows stay inside one organisation -----------------------------------
+
+
+def _one(model, organisation_id, *where):
+    with session_scope() as session, system_scope(session):
+        return session.scalars(
+            select(model).where(model.organisation_id == organisation_id, *where)
+        ).first()
+
+
+def test_database_refuses_a_lesson_on_another_organisations_topic(orgs):
+    b_topic = _one(Topic, orgs.b)
+    with pytest.raises(IntegrityError), session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        session.add(Lesson(topic_id=b_topic.id, format="tutorial"))
+        session.flush()
+
+
+def test_database_refuses_a_prerequisite_in_another_organisation(orgs):
+    a_topic = _one(Topic, orgs.a)
+    b_topic = _one(Topic, orgs.b)
+    with pytest.raises(IntegrityError), session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        session.add(TopicPrerequisite(topic_id=a_topic.id, prerequisite_id=b_topic.id))
+        session.flush()
+
+
+def test_database_refuses_a_session_for_another_organisations_user(orgs):
+    b_user = _one(User, orgs.b)
+    with pytest.raises(IntegrityError), session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        session.add(UserSession(user_id=b_user.id, token_hash="x" * 64,
+                                expires_at=datetime(2030, 1, 1, tzinfo=UTC)))
+        session.flush()
+
+
+def test_published_version_must_belong_to_the_same_lesson(orgs):
+    a_lesson = _one(Lesson, orgs.a)
+    a_topic = _one(Topic, orgs.a, Topic.id != a_lesson.topic_id)
+    with pytest.raises(IntegrityError), session_scope() as session:
+        scope_to_organisation(session, orgs.a)
+        other = Lesson(topic_id=a_topic.id, format="tutorial")
+        session.add(other)
+        session.flush()
+        # Point the new lesson at the sample lesson's version.
+        other.published_version_id = a_lesson.published_version_id
+        session.flush()

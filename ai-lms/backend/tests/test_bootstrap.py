@@ -5,8 +5,8 @@ import threading
 from sqlalchemy import func, select
 
 from ailms import bootstrap
-from ailms.catalog.api import Topic
-from ailms.identity.api import Organisation
+from ailms.catalog.models import Topic
+from ailms.identity.models import Organisation
 from ailms.platform.db import session_scope, system_scope
 
 

@@ -1,14 +1,16 @@
 import uuid
+from datetime import timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ailms.identity import service
+from ailms.identity import service, tasks
 from ailms.identity.deps import SESSION_COOKIE, current_user, organisation_session
 from ailms.identity.service import AccessCodeError, CurrentUser, Role, SignInError
-from ailms.platform.db import get_session
+from ailms.platform import ratelimit
+from ailms.platform.db import current_organisation_id, get_session
 from ailms.platform.settings import get_settings
 
 router = APIRouter(tags=["identity"])
@@ -71,23 +73,61 @@ def _set_cookie(request: Request, response: Response, token: str) -> None:
     )
 
 
-@router.post("/auth/request-code", status_code=204, responses={422: {"model": ErrorOut}})
-def request_code(body: RequestCodeIn, session: Session = Depends(organisation_session)) -> None:
-    """Email a one-time sign-in code. Always 204, whether or not the account exists."""
+_TOO_MANY = "Too many requests from this address. Please wait a while and try again."
+
+
+def _client(request: Request) -> str:
+    # Behind the web server this is the browser's address (see platform/proxy.py).
+    return request.client.host if request.client else "unknown"
+
+
+def _check_client_rate(
+    session: Session, request: Request, action: str, limit: int
+) -> None:
+    allowed = ratelimit.allow(
+        session, action=action, client=_client(request), limit=limit, window=timedelta(hours=1)
+    )
+    if not allowed:
+        session.commit()
+        raise HTTPException(status_code=429, detail=_TOO_MANY)
+
+
+@router.post(
+    "/auth/request-code",
+    status_code=204,
+    responses={422: {"model": ErrorOut}, 429: {"model": ErrorOut}},
+)
+def request_code(
+    body: RequestCodeIn, request: Request, session: Session = Depends(organisation_session)
+) -> None:
+    """Email a one-time sign-in code. Always 204, whether or not the account exists.
+
+    The request only puts a job on the queue; the worker decides whether to send, so the
+    answer takes the same time for a known and an unknown address.
+    """
     try:
-        service.request_code(session, body.email)
+        email = service.normalise_email(body.email)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    _check_client_rate(
+        session, request, "request-code", get_settings().client_max_code_requests_per_hour
+    )
+    tasks.send_sign_in_code.defer(
+        organisation_id=str(current_organisation_id(session)), email=email
+    )
     session.commit()
 
 
-@router.post("/auth/verify-code", responses={400: {"model": ErrorOut}})
+@router.post("/auth/verify-code", responses={400: {"model": ErrorOut}, 429: {"model": ErrorOut}})
 def verify_code(
     body: VerifyCodeIn,
     request: Request,
     response: Response,
     session: Session = Depends(organisation_session),
 ) -> SignedInOut:
+    _check_client_rate(
+        session, request, "verify-code", get_settings().client_max_code_checks_per_hour
+    )
     try:
         user = service.verify_code(session, body.email, body.code)
     except SignInError:

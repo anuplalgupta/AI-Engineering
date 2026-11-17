@@ -68,7 +68,7 @@ All the commands below are typed in this folder. If you open a new Ubuntu window
    ```
    sh ai-lms/deploy/setup.sh
    ```
-   It writes `ai-lms/deploy/.env`. There are no default passwords: each computer gets its own. If the file already exists, the script stops and changes nothing.
+   It writes `ai-lms/deploy/.env`. There are no default passwords: each computer gets its own. If the file already exists, the script changes nothing, except that it adds any setting a newer version needs (it says so when it does).
 
 ## 6. Start
 
@@ -101,6 +101,8 @@ Sign-in by email works without sending real email: messages are caught by a mail
 1. Sign out, then under **Sign in with your email** enter `student@demo.example` (or any made-up address, which creates a new student account) and click **Send me a code**.
 2. Open **http://localhost:8025** in another tab. The newest message holds a six-digit code.
 3. Type the code and click **Sign in**. A code works once and expires after 10 minutes.
+
+The email can take a few seconds to arrive: it is sent by the `worker` part, not straight away. To stop guessing, an address that gets 10 wrong codes in a day cannot sign in by email for 24 hours, and no more than 10 codes a day are sent to one address. Too many requests from one computer in an hour get the message *Too many requests from this address*; wait and try again.
 
 ## 9. Stop, and start again
 
@@ -148,6 +150,8 @@ Only the `ailms` project is affected; other Docker containers on the computer ar
 | What you see | What to do |
 |---|---|
 | `Run the setup script first` | Do step 5, then start again |
+| `Run the setup script first` after updating to a newer version | Run the setup script of step 5 again: it adds the new setting to your existing file and keeps your data |
+| No email arrives in the mail viewer | Check that `worker` is (healthy) in the `ps` command of step 6, and wait a few seconds |
 | `port is already allocated` for 8080 or 8025 | Another program uses that port. Stop it, or ask a developer to change the port in `ai-lms/deploy/compose.yaml` |
 | The page at localhost:8080 does not load | Wait a minute after starting, then run the `ps` command of step 6. To see what went wrong: `docker compose -p ailms -f ai-lms/deploy/compose.yaml logs backend` |
 | `CERTIFICATE_VERIFY_FAILED`, `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` or `SELF_SIGNED_CERT_IN_CHAIN` while building, on a company network | The network inspects secure connections. Ask IT for the company's root certificate as a `.pem` file, add a line `AILMS_EXTRA_CA=/path/to/that.pem` to the end of `ai-lms/deploy/.env` (in Ubuntu a path such as `/home/you/company-root.pem`; in PowerShell a path such as `C:/Users/you/company-root.pem`, with forward slashes), and start again. Certificates are still checked; this only adds your company's one to the trusted list while building |

@@ -6,9 +6,10 @@ import re
 from sqlalchemy import func, select
 
 from ailms import seed
-from ailms.catalog.api import Topic, TopicPrerequisite
-from ailms.content.api import Lesson, LessonDocument, LessonVersion
-from ailms.identity.api import User
+from ailms.catalog.models import Topic, TopicPrerequisite
+from ailms.content.api import LessonDocument
+from ailms.content.models import Lesson, LessonVersion
+from ailms.identity.models import User
 from ailms.platform.audit import StatusChange
 from ailms.platform.db import scope_to_organisation, session_scope
 from ailms.platform.settings import get_settings

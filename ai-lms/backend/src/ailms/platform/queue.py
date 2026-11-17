@@ -1,6 +1,6 @@
 """The job queue: Procrastinate, stored in PostgreSQL (ADR 0002).
 
-The worker runs:  procrastinate --app=ailms.platform.queue.app worker
+The worker runs:  procrastinate --app=ailms.worker.app worker  (ailms/worker.py registers every job)
 """
 
 import uuid

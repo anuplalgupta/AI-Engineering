@@ -32,5 +32,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
 
-# Prepare the database and sample data, then serve. The worker overrides this command.
-CMD ["sh", "-c", "python -m ailms.bootstrap && exec uvicorn ailms.main:app --host 0.0.0.0 --port 8000 --no-server-header"]
+# Prepare the database and sample data, then serve. The web server does not keep the
+# schema owner's password (ADMIN_DATABASE_URL). The worker overrides this command.
+CMD ["sh", "-c", "python -m ailms.bootstrap && exec env -u ADMIN_DATABASE_URL uvicorn ailms.main:app --host 0.0.0.0 --port 8000 --no-server-header"]

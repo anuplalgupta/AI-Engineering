@@ -90,6 +90,9 @@ export interface paths {
         /**
          * Request Code
          * @description Email a one-time sign-in code. Always 204, whether or not the account exists.
+         *
+         *     The request only puts a job on the queue; the worker decides whether to send, so the
+         *     answer takes the same time for a known and an unknown address.
          */
         post: operations["request_code"];
         delete?: never;
@@ -697,6 +700,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorOut"];
                 };
             };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
         };
     };
     verify_code: {
@@ -737,6 +749,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
                 };
             };
         };

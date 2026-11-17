@@ -26,6 +26,7 @@ forbidden_modules = [
     "ailms.identity", "ailms.catalog", "ailms.content",
     "ailms.assessment", "ailms.learner", "ailms.analytics",
     "ailms.main", "ailms.seed", "ailms.bootstrap", "ailms.registry", "ailms.system_routes",
+    "ailms.worker",
 ]
 
 [[tool.importlinter.contracts]]
@@ -87,12 +88,20 @@ name = "the application shell uses modules through api.py only"
 type = "forbidden"
 source_modules = [
     "ailms.main", "ailms.seed", "ailms.bootstrap", "ailms.registry",
-    "ailms.system_routes", "ailms.tools",
+    "ailms.system_routes", "ailms.tools", "ailms.worker",
 ]
 forbidden_modules = [
     "ailms.identity", "ailms.catalog", "ailms.content",
     "ailms.assessment", "ailms.learner", "ailms.analytics",
 ]
 allow_indirect_imports = true
-ignore_imports = ["ailms.* -> ailms.*.api", "ailms.tools.** -> ailms.*.api"]
+ignore_imports = [
+    "ailms.* -> ailms.*.api",
+    "ailms.tools.** -> ailms.*.api",
+    # Only the schema registry (for migrations) may import the table definitions.
+    "ailms.registry -> ailms.*.models",
+]
 unmatched_ignore_imports_alerting = "none"
+
+# api.py exports no tables (ORM classes); tests/test_checks.py checks that, so the
+# contracts above cannot be side-stepped by importing a table through api.py.
